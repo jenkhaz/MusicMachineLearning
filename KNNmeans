@@ -1,0 +1,81 @@
+import os
+import pandas as pd
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
+import pickle
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+
+def main():
+    # Load the dataset
+    data = pd.read_csv('C:/Users/User/OneDrive - American University of Beirut/Desktop/E3/EECE 490/MLproj/ML_Codes/MusicMachineLearning/audio_features(disco_classical).csv')
+
+    # Remove brackets from columns and ensure numeric conversion
+    for column in data.columns:
+        if data[column].dtype == 'object':
+            data[column] = data[column].astype(str).str.strip("[]").astype(float, errors='ignore')
+
+    # Separate features and labels
+    X = data.drop(columns=['Label'])
+    y = data['Label']
+
+    # Normalize the features
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    # Split the data: 80% training, 20% testing
+    X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
+
+    # Initialize the k-NN classifier with k neighbors
+    knn = KNeighborsClassifier(n_neighbors=5)
+
+    # Train the classifier
+    knn.fit(X_train, y_train)
+
+    # Predict on the test set
+    y_pred = knn.predict(X_test)
+
+    # Evaluate classification accuracy
+    accuracy = accuracy_score(y_test, y_pred)
+    print(f"\nClassification accuracy: {accuracy:.2f}")
+
+    # Detailed classification report
+    print("\nClassification Report:")
+    print(classification_report(y_test, y_pred))
+
+    # Confusion matrix
+    print("\nConfusion Matrix:")
+    print(confusion_matrix(y_test, y_pred))
+
+    # Apply PCA for visualization
+    pca = PCA(n_components=2)
+    X_pca = pca.fit_transform(X_scaled)
+    data['PCA1'] = X_pca[:, 0]
+    data['PCA2'] = X_pca[:, 1]
+
+    # Visualize original labels
+    plt.figure(figsize=(10, 8))
+    for label in y.unique():
+        subset = data[data['Label'] == label]
+        plt.scatter(subset['PCA1'], subset['PCA2'], label=f"{label} (Original)", alpha=0.6)
+    plt.title('PCA Visualization by Original Labels')
+    plt.xlabel('Principal Component 1')
+    plt.ylabel('Principal Component 2')
+    plt.legend()
+    plt.grid()
+    plt.savefig('original_label_visualization.png')
+    plt.show()
+    print("Original label plot saved as 'original_label_visualization.png'")
+
+    # Save the scaler
+    with open('scaler.pkl', 'wb') as f:
+        pickle.dump(scaler, f)
+
+    # Save the k-NN model
+    with open('knn_model.pkl', 'wb') as f:
+        pickle.dump(knn, f)
+
+if __name__ == "__main__":
+    main()

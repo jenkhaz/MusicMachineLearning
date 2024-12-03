@@ -8,8 +8,9 @@ import pandas as pd
 base_path = os.path.dirname(os.path.abspath(__file__))
 
 # Construct absolute paths
-classical_path = os.path.join(base_path, 'Data/genres_original/classical/')
-disco_path = os.path.join(base_path, 'Data/genres_original/disco/')
+classical_path = os.path.join(base_path, 'C:/Users/User/OneDrive - American University of Beirut/Desktop/E3/EECE 490/MLproj/Data/Classical')
+disco_path = os.path.join(base_path, 'C:/Users/User/OneDrive - American University of Beirut/Desktop/E3/EECE 490/MLproj/Data/Disco')
+techno_path= os.path.join(base_path, 'C:/Users/User/OneDrive - American University of Beirut/Desktop/E3/EECE 490/MLproj/Data/Tech')
 
 # Function to extract features
 def extract_features(file_path):
@@ -42,6 +43,7 @@ def process_dataset(dataset_path, label):
 # Extract features for both genres
 classical_features = process_dataset(classical_path, 'classical')
 disco_features = process_dataset(disco_path, 'disco')
+techno_features= process_dataset(techno_path, 'techno')
 
 # Define columns for the DataFrame
 columns = ['Chroma', 'Tempo', 'Spectral_Centroid', 'Zero_Crossing_Rate', 
@@ -50,9 +52,9 @@ columns = ['Chroma', 'Tempo', 'Spectral_Centroid', 'Zero_Crossing_Rate',
            'MFCC_13', 'Rhythmic_Regularity', 'Label']
 
 # Create a DataFrame
-df = pd.DataFrame(classical_features + disco_features, columns=columns)
+df = pd.DataFrame(classical_features + disco_features+techno_features, columns=columns)
 
 # Save to CSV
-df.to_csv('audio_features.csv', index=False)
+df.to_csv('audio_features(disco_classical_techno).csv', index=False)
 
 print("Feature extraction completed and saved to 'audio_features.csv'")
