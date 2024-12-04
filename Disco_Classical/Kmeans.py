@@ -8,7 +8,7 @@ import pickle
 
 def main():
     # Load the dataset
-    data = pd.read_csv('C:/Users/User/OneDrive - American University of Beirut/Desktop/E3/EECE 490/MLproj/ML_Codes/MusicMachineLearning/audio_features(disco_classical).csv')
+    data = pd.read_csv('audio_features(disco_classical).csv')
   
 
     # Remove brackets from columns and ensure numeric conversion
@@ -77,7 +77,7 @@ def main():
     print(f"\nClustering accuracy: {accuracy:.2f}%")
 
     # Save the updated dataset
-    data.to_csv('audio_features_with_clusters_and_pca.csv', index=False)
+    data.to_csv('audio_features_with_clusters_and_pca(classical_disco).csv', index=False)
     print("Clustering and PCA completed. Results saved to 'audio_features_with_clusters_and_pca.csv'.")
 
     # Save the scaler

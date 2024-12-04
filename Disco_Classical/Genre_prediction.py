@@ -1,5 +1,5 @@
 import librosa
-
+import pandas as pd
 from sklearn.preprocessing import StandardScaler
 import pickle
 import librosa
@@ -45,11 +45,30 @@ def extract_features(file_path):
 def predict_genre(song_path):
     # Extract features from the audio file
     features = extract_features(song_path)
+    
+    # Define the feature names (must match training dataset)
+    feature_names = ['Chroma', 'Tempo', 'Spectral_Centroid', 'Zero_Crossing_Rate', 
+                     'MFCC_1', 'MFCC_2', 'MFCC_3', 'MFCC_4', 'MFCC_5', 'MFCC_6', 
+                     'MFCC_7', 'MFCC_8', 'MFCC_9', 'MFCC_10', 'MFCC_11', 'MFCC_12', 
+                     'MFCC_13', 'Rhythmic_Regularity']
+    
+    # Convert features to a DataFrame
+    features_df = pd.DataFrame([features], columns=feature_names)
+    
     # Scale the features using the pre-trained scaler
-    features_scaled = scaler.transform([features])
+    features_scaled = scaler.transform(features_df)
+    
     # Predict the cluster using the pre-trained KMeans model
     cluster = kmeans.predict(features_scaled)[0]
+    
     # Map the cluster to the corresponding genre label
     return cluster_labels[cluster]
 
-print("This song is :", predict_genre( 'C:/Users/User/OneDrive - American University of Beirut/Desktop/E3/EECE 490/MLproj/Data/Techno/Adam Beyer \- Don\'t Go'))
+# Define the directory and file naming format
+directory = "C:/Users/User/OneDrive - American University of Beirut/Desktop/E3/EECE 490/MLproj/Data/Disco/"
+file_format = "disco.{:05d}.wav"  # Formats numbers as 00001, 00002, etc.
+
+# Loop through the range and generate file paths
+for i in range(1, 2):
+    file_path = directory + file_format.format(i)
+    print(f"This song is: {predict_genre(file_path)}")
