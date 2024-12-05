@@ -77,7 +77,7 @@ def compute_transformation_vector(features_scaled):
     target_non_harmonic = np.delete(target_centroid, chroma_index)
     
     # Compute the transformation vector for non-harmonic features
-    transformation_vector = target_non_harmonic - current_non_harmonic
+    transformation_vector = target_non_harmonic - non_harmonic_features
     scale_factor = 1.0
     new_non_harmonic_features = non_harmonic_features + scale_factor * transformation_vector
     
