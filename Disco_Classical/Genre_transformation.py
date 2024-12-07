@@ -1,5 +1,5 @@
-import librosa
-import numpy as np
+import librosa # type: ignore
+import numpy as np # type: ignore
 import pickle
 import pandas as pd
 
@@ -61,48 +61,67 @@ def predict_genre(song_path):
     return (cluster_labels[cluster],features_scaled)
 # Compute transformation vector
 def compute_transformation_vector(features_scaled):
+    # Identify the current cluster
     current_cluster = kmeans.predict(features_scaled)[0]
-    target_cluster = [key for key, value in cluster_labels.items() if value.lower() == 'disco'][0]
     
+    # Determine the target cluster (assuming binary clustering)
+    target_cluster = 1 if current_cluster == 0 else 0
+    
+    # Retrieve cluster centroids
     centroids = kmeans.cluster_centers_
     current_centroid = centroids[current_cluster]
     target_centroid = centroids[target_cluster]
     
-    chroma_index = 0  # Assuming chroma is the first feature
+    # Compute the hyperplane parameters
+    w = target_centroid - current_centroid
+    b = (np.dot(target_centroid, target_centroid) - np.dot(current_centroid, current_centroid)) / 2.0
+    
+    # Preserve the chroma feature (assumed to be the first feature)
+    chroma_index = 0
     chroma_feature = features_scaled[0][chroma_index]
     
-    # Exclude chroma from transformation
-    non_harmonic_features = np.delete(features_scaled[0], chroma_index)
-    current_non_harmonic = np.delete(current_centroid, chroma_index)
-    target_non_harmonic = np.delete(target_centroid, chroma_index)
+    # Compute the offset b'
+    b_prime = b - w[chroma_index] * chroma_feature
     
-    # Compute the transformation vector for non-harmonic features
-    transformation_vector = target_non_harmonic - non_harmonic_features
-    scale_factor = 1.0
-    new_non_harmonic_features = non_harmonic_features + scale_factor * transformation_vector
+    # Initialize new features with original values
+    new_features = features_scaled[0].copy()
     
-    # Reconstruct features, keeping chroma unchanged
-    new_features = np.insert(new_non_harmonic_features, chroma_index, chroma_feature)
+    # Adjust non-chroma features
+    non_chroma_indices = [i for i in range(len(new_features)) if i != chroma_index]
+    w_non_chroma = w[non_chroma_indices]
+    original_non_chroma = new_features[non_chroma_indices]
     
-    # Restore original chroma after inverse scaling
+    # Solve for the adjustment
+    adjustment = (b_prime - np.dot(w_non_chroma, original_non_chroma)) / np.sum(w_non_chroma)
+    
+    # Apply the adjustment proportionally
+    new_non_chroma_features = original_non_chroma + adjustment * (w_non_chroma / np.linalg.norm(w_non_chroma))
+    
+    # Update the new features
+    new_features[non_chroma_indices] = new_non_chroma_features
+    
+    # Restore chroma feature explicitly before scaling back
+    new_features[chroma_index] = chroma_feature
+    
+    # Inverse transform to original scale
     new_song_features = scaler.inverse_transform([new_features])
-    new_song_features[0][chroma_index] = scaler.inverse_transform(features_scaled)[0][chroma_index]
     
-    return transformation_vector, new_song_features
-
-
-song_path = input("Please input the song's path: ")
+    # Restore the chroma feature in the original scale explicitly
+    original_features_in_original_scale = scaler.inverse_transform(features_scaled)
+    new_song_features[0][chroma_index] = original_features_in_original_scale[0][chroma_index]
+    
+    return new_song_features
 
 # Extract features
+song_path = "C:/Users/User/OneDrive - American University of Beirut/Desktop/E3/EECE 490/MLproj/Data/Classical/01.wav"
 features = extract_features(song_path)
-
 # Predict the genre using the file path, not the features
 Current_genre, features = predict_genre(song_path)
 print (Current_genre)
 if Current_genre == 'classical':
-    transformation_vector, adjusted_features = compute_transformation_vector(features)
+    adjusted_features = compute_transformation_vector(features)
     print("Original Features:", features)
-    print("Transformation Vector:", transformation_vector)
+    
     print("Adjusted Features (in original scale):", adjusted_features)
    
 else:
