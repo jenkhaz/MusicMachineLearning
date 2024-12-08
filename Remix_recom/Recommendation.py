@@ -17,15 +17,21 @@ def process_audio_files(classical_path, disco_path):
     disco, sr2 = librosa.load(disco_path, sr=None)
 
     # Detect beats and tempos
-    tempo1, beats1 = librosa.beat.beat_track(y=classical, sr=sr1)
-    tempo2, beats2 = librosa.beat.beat_track(y=disco, sr=sr2)
+    tempo1_array, beats1 = librosa.beat.beat_track(y=classical, sr=sr1)
+    tempo2_array, beats2 = librosa.beat.beat_track(y=disco, sr=sr2)
+
+    # Extract scalar tempo values
+    tempo1 = tempo1_array if isinstance(tempo1_array, (int, float)) else tempo1_array[0]
+    tempo2 = tempo2_array if isinstance(tempo2_array, (int, float)) else tempo2_array[0]
+
     print(f"Classical Tempo: {tempo1}, Disco Tempo: {tempo2}")
 
     # Adjust tempo of disco to match classical
-    target_tempo = tempo1
+    target_tempo = tempo1  # Classical tempo
     disco_matched = librosa.effects.time_stretch(disco, rate=tempo2 / target_tempo)
 
-    # Align lengths: Match the length of disco to classical
+
+        # Align lengths: Match the length of disco to classical
     aligned_disco = librosa.util.fix_length(disco_matched, len(classical))
 
     # Save numpy arrays as temporary WAV files
