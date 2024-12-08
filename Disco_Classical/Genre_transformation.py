@@ -59,70 +59,88 @@ def predict_genre(song_path):
     
     # Map the cluster to the corresponding genre label
     return (cluster_labels[cluster],features_scaled)
-# Compute transformation vector
-def compute_transformation_vector(features_scaled):
-    # Identify the current cluster
-    current_cluster = kmeans.predict(features_scaled)[0]
+def transform_to_target_cluster(features_scaled, controllable_indices, source_cluster, target_cluster, alpha=0.1, steps=10):
+    """
+    Transform features of a song to align more closely with the target cluster, returning the musician-readable format.
+    """
+    # Get centroids for source and target clusters
+    source_centroid = kmeans.cluster_centers_[source_cluster]
+    target_centroid = kmeans.cluster_centers_[target_cluster]
+
+    # Initialize feature vector
+    current_features = features_scaled[0].copy()
+
+    # Keep a copy of the original feature vector
+    original_features = current_features.copy()
+
+    for step in range(steps):
+        # Update only controllable indices
+        for idx in controllable_indices:
+            # Move controllable features toward the target cluster centroid
+            current_features[idx] += alpha * (target_centroid[idx] - current_features[idx])
+
+        # Compute the current distance to the target centroid (controllable features only)
+        controllable_distance = np.linalg.norm(
+            current_features[controllable_indices] - target_centroid[controllable_indices]
+        )
+        print(f"Step {step}, Distance to Target Centroid (Controllable Features): {controllable_distance}")
+
+        # Stop if the adjusted features belong to the target cluster
+        if kmeans.predict([current_features])[0] == target_cluster:
+            print(f"Reached target cluster at step {step}")
+            break
+
+    # Combine updated controllable features with fixed original features for non-controllable indices
+    for idx in range(len(current_features)):
+        if idx not in controllable_indices:
+            current_features[idx] = original_features[idx]
+
+    # Inverse transform the final features to their original scale
+    transformed_features_original_scale = scaler.inverse_transform([current_features])
     
-    # Determine the target cluster (assuming binary clustering)
-    target_cluster = 1 if current_cluster == 0 else 0
-    
-    # Retrieve cluster centroids
-    centroids = kmeans.cluster_centers_
-    current_centroid = centroids[current_cluster]
-    target_centroid = centroids[target_cluster]
-    
-    # Compute the hyperplane parameters
-    w = target_centroid - current_centroid
-    b = (np.dot(target_centroid, target_centroid) - np.dot(current_centroid, current_centroid)) / 2.0
-    
-    # Preserve the chroma feature (assumed to be the first feature)
-    chroma_index = 0
-    chroma_feature = features_scaled[0][chroma_index]
-    
-    # Compute the offset b'
-    b_prime = b - w[chroma_index] * chroma_feature
-    
-    # Initialize new features with original values
-    new_features = features_scaled[0].copy()
-    
-    # Adjust non-chroma features
-    non_chroma_indices = [i for i in range(len(new_features)) if i != chroma_index]
-    w_non_chroma = w[non_chroma_indices]
-    original_non_chroma = new_features[non_chroma_indices]
-    
-    # Solve for the adjustment
-    adjustment = (b_prime - np.dot(w_non_chroma, original_non_chroma)) / np.sum(w_non_chroma)
-    
-    # Apply the adjustment proportionally
-    new_non_chroma_features = original_non_chroma + adjustment * (w_non_chroma / np.linalg.norm(w_non_chroma))
-    
-    # Update the new features
-    new_features[non_chroma_indices] = new_non_chroma_features
-    
-    # Restore chroma feature explicitly before scaling back
-    new_features[chroma_index] = chroma_feature
-    
-    # Inverse transform to original scale
-    new_song_features = scaler.inverse_transform([new_features])
-    
-    # Restore the chroma feature in the original scale explicitly
-    original_features_in_original_scale = scaler.inverse_transform(features_scaled)
-    new_song_features[0][chroma_index] = original_features_in_original_scale[0][chroma_index]
-    
-    return new_song_features
+    # Return only the controllable features in their original scale
+    transformed_controllable_features = transformed_features_original_scale[0][controllable_indices]
+    return transformed_controllable_features, transformed_features_original_scale
+
+
 
 # Extract features
 song_path = "C:/Users/User/OneDrive - American University of Beirut/Desktop/E3/EECE 490/MLproj/Data/Classical/01.wav"
 features = extract_features(song_path)
-# Predict the genre using the file path, not the features
-Current_genre, features = predict_genre(song_path)
-print (Current_genre)
-if Current_genre == 'classical':
-    adjusted_features = compute_transformation_vector(features)
-    print("Original Features:", features)
-    
-    print("Adjusted Features (in original scale):", adjusted_features)
-   
-else:
-    print("We can only recommend changes applicable to classical songs, sorry :(")
+_, features_scaled = predict_genre(song_path)
+
+# Define controllable indices (e.g., tempo, rhythmic regularity, MFCCs)
+controllable_indices = [1, -1]  # Tempo and Rhythmic Regularity (adjust based on your feature set)
+
+# Identify source and target clusters
+source_cluster = 0  # Classical
+target_cluster = 1  # Disco
+# Transform features
+transformed_controllable_features, transformed_features_original_scale = transform_to_target_cluster(
+    features_scaled, controllable_indices, source_cluster, target_cluster
+)
+
+# Print the results
+print("Original Features (Scaled):", features_scaled)
+print("Transformed Controllable Features (Musician Format):", transformed_controllable_features)
+print("Entire Transformed Features (Original Scale):", transformed_features_original_scale)
+
+# Check the cluster of the transformed features
+new_cluster = kmeans.predict([transformed_features_original_scale[0]])[0]
+print(f"New cluster: {new_cluster}, which is the {cluster_labels[new_cluster]} cluster")
+
+
+"""
+transformed_features = transform_to_target_cluster(features_scaled, controllable_indices, source_cluster, target_cluster)
+
+print("Transformed Features (Original Scale):", transformed_features)
+#else:
+   # print("We can only recommend changes applicable to classical songs, sorry :(")
+   # Ensure adjusted_features is reshaped into 2D array
+#adjusted_features = adjusted_features.reshape(1, -1)
+print("orginial",features_scaled)
+new_cluster = kmeans.predict(transformed_features)[0]
+print (f"New cluster: {new_cluster}, which is the {cluster_labels[new_cluster]} cluster")
+#old_cluster=kmeans.predict(features)[0]
+#print (f"New cluster: {old_cluster}, which is the {cluster_labels[old_cluster]} cluster")
+"""
