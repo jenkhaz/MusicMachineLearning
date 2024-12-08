@@ -13,6 +13,7 @@ techno_path= os.path.join(base_path, 'C:/Users/User/OneDrive - American Universi
 
 # Function to extract features
 def extract_features(file_path):
+    
     y, sr = librosa.load(file_path, sr=22050)
 
     chroma = librosa.feature.chroma_stft(y=y, sr=sr).mean()
