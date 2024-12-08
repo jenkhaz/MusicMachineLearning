@@ -53,8 +53,8 @@ def process_audio_files(classical_path, disco_path):
     print(f"Pitch-shifted classical track saved as: {shifted_output}")
 
 # Input file paths
-classical_file = "C:/Users/User/OneDrive - American University of Beirut/Desktop/E3/EECE 490/MLproj/Data/Classical/01.wav"
-disco_file ="C:/Users/User/OneDrive - American University of Beirut/Desktop/E3/EECE 490/MLproj/Data/Disco/01.wav"
+classical_file = r"C:\Users\Lenovo\Desktop\MusicMachineLearning\Remix_recom\01.wav"
+disco_file =r"C:\Users\Lenovo\Desktop\MusicMachineLearning\Remix_recom\01 copy.wav"
 
 # Process the audio files
 process_audio_files(classical_file, disco_file)
