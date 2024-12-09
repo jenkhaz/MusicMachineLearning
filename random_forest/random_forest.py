@@ -8,11 +8,11 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 import matplotlib.pyplot as plt
 import seaborn as sns
-
+from matplotlib.colors import LinearSegmentedColormap
 
 def main():
     # Load the dataset from the CSV file
-    csv_file_path = r'C:\Users\Lenovo\Desktop\MusicMachineLearning\audio_features_genres_with_segments.csv'
+    csv_file_path = r'C:\Users\Lenovo\Desktop\MusicMachineLearning\add_data\audio_features_genres_with_segments.csv'
     print("Loading dataset from CSV file...")
     data = pd.read_csv(csv_file_path)
     print(f"Dataset loaded. Total samples: {len(data)}")
@@ -79,17 +79,20 @@ def main():
     print("Classification Report:")
     print(classification_report(y_test, y_pred, target_names=label_encoder.classes_))
 
+    # Create a custom colormap for the confusion matrix
+    custom_cmap = LinearSegmentedColormap.from_list("custom_cmap", ["#fef5f8","#830131"], N=256)
+
     # Plot and save confusion matrix
     conf_mat = confusion_matrix(y_test, y_pred)
     plt.figure(figsize=(8, 6))
     sns.heatmap(conf_mat, annot=True, fmt='d',
                 xticklabels=label_encoder.classes_,
                 yticklabels=label_encoder.classes_,
-                cmap='Blues')
+                cmap=custom_cmap, cbar=True)
     plt.ylabel('Actual')
     plt.xlabel('Predicted')
-    plt.title('Confusion Matrix')
-    plt.savefig('confusion_matrix.png')  # Save plot
+    plt.title('Confusion Matrix with Custom Color Gradient')
+    plt.savefig('confusion_matrix_custom_gradient.png')  # Save plot
     plt.show()
 
     # Hyperparameter tuning
@@ -97,7 +100,7 @@ def main():
     param_grid = {
         'n_estimators': [100, 200],
         'max_depth': [None, 10, 20],
-        'max_features': [None, 'sqrt'],  # Replace 'auto' with None
+        'max_features': [None, 'sqrt'],
         'min_samples_leaf': [1, 2]
     }
     grid_search = GridSearchCV(
@@ -136,7 +139,7 @@ def main():
     })
     feature_importances.sort_values(by='Importance', ascending=False, inplace=True)
 
-    # Custom colors
+    # Custom colors for feature importance plot
     colors = ['#1d434e', '#4eb6b0', '#830131', '#a96d83'] * 5
 
     # Plot and save feature importances
