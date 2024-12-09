@@ -55,7 +55,7 @@ def prepare_dataset(data_dir, n_mfcc=13):
     return np.array(features)
 
 # Training Parameters
-data_dir = 'C:\\Users\\user\\musicml_490\\MusicMachineLearning\\autoencoder_kmeans\\songs_gtzan'
+data_dir = r"C:\Users\Lenovo\Desktop\MusicMachineLearning\audio_features_genres_with_segments.csv"
 features = prepare_dataset(data_dir)
 input_shape = features.shape[1:]
 
