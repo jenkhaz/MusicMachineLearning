@@ -1,87 +1,162 @@
 import pandas as pd
+import pickle
 from sklearn.metrics.pairwise import cosine_similarity
+import librosa  # For audio feature extraction
 import numpy as np
 
-def recommend_songs(input_song_name, csv_path, top_n=5):
-    """
-    Recommends songs from the dataset that would go well with the input song for a remix.
+# Function to load artifacts: dataset, scaler, KMeans model, and cluster labels
+def load_artifacts():
+    # Load the preprocessed data
+    data = pd.read_csv(r"C:\Users\Lenovo\Desktop\MusicMachineLearning\add_data\audio_features_genres_with_segments.csv")
+    print("Dataset loaded successfully. Number of rows:", len(data))
 
-    Parameters:
-    - input_song_name (str): Name of the song (must match the Segment_File_Name in the CSV).
-    - csv_path (str): Path to the CSV file containing song features.
-    - top_n (int): Number of recommendations to return.
+    # Load the scaler
+    with open(r"C:\Users\Lenovo\Desktop\MusicMachineLearning\add_data\scaler_2_clusters.pkl", 'rb') as f:
+        scaler = pickle.load(f)
+    print("Scaler loaded successfully.")
 
-    Returns:
-    - List of recommended songs.
-    """
-    # Load the dataset
-    data = pd.read_csv(csv_path)
+    # Load the K-Means model
+    with open(r"C:\Users\Lenovo\Desktop\MusicMachineLearning\add_data\kmeans_model_2_clusters.pkl", 'rb') as f:
+        kmeans = pickle.load(f)
+    print("KMeans model loaded successfully.")
 
-    # Ensure the required columns are present
-    if 'Segment_File_Name' not in data.columns:
-        raise ValueError("The dataset must contain a 'Segment_File_Name' column.")
+    # Load the cluster labels
+    with open(r"C:\Users\Lenovo\Desktop\MusicMachineLearning\add_data\cluster_labels_2_clusters.pkl", 'rb') as f:
+        cluster_labels = pickle.load(f)
+    print("Cluster labels loaded successfully:", cluster_labels)
 
-    # Extract the base song name (remove segment info)
-    def get_base_song_name(file_name):
-        return "_".join(file_name.split("_segment")[0].split())
+    return data, scaler, kmeans, cluster_labels
 
-    input_base_song_name = get_base_song_name(input_song_name)
-
-    # Filter out segments of the same song
-    data['Base_Song_Name'] = data['Segment_File_Name'].apply(get_base_song_name)
-    filtered_data = data[data['Base_Song_Name'] != input_base_song_name]
-
-    # Drop non-numeric columns for similarity calculation
-    non_feature_columns = ['Label', 'Segment_File_Name', 'Base_Song_Name']
-    feature_columns = [col for col in data.columns if col not in non_feature_columns]
-
-    # Convert feature columns to numeric values (handle nested lists or complex strings)
-    for col in feature_columns:
-        filtered_data[col] = filtered_data[col].apply(
-            lambda x: np.mean([float(i) for i in str(x).strip("[]").split(",") if i.strip()]) if isinstance(x, str) else x
-        )
-        data[col] = data[col].apply(
-            lambda x: np.mean([float(i) for i in str(x).strip("[]").split(",") if i.strip()]) if isinstance(x, str) else x
-        )
-
-    # Ensure the input song exists in the dataset
-    if input_song_name not in data['Segment_File_Name'].values:
-        raise ValueError(f"The song '{input_song_name}' is not in the dataset.")
-
-    # Normalize features
-    features = filtered_data[feature_columns]
-    features_normalized = (features - features.mean()) / features.std()
-
-    # Extract and normalize the input song features
-    input_features = data.loc[data['Segment_File_Name'] == input_song_name, feature_columns]
-    input_features = input_features.astype(float)  # Ensure all values are numeric
-    input_features_normalized = (input_features - features.mean()) / features.std()
-    input_features_normalized = input_features_normalized.to_numpy()  # Convert to NumPy array
-
-    # Calculate similarity between the input song and all other songs
-    similarity_scores = cosine_similarity(input_features_normalized, features_normalized).flatten()
-
-    # Get the indices of the top_n most similar songs
-    similar_indices = np.argsort(similarity_scores)[::-1][:top_n]
-
-    # Fetch recommended songs
-    recommended_songs = filtered_data.iloc[similar_indices]['Segment_File_Name'].values
-
-    return recommended_songs
-
-# Example Usage
-if __name__ == "__main__":
-    # Input CSV file path
-    csv_file = r"C:\Users\Lenovo\Desktop\MusicMachineLearning\audio_features_genres_with_segments.csv"
+# Function to extract features from an audio file
+def extract_features(file_path):
+    print(f"Extracting features from file: {file_path}")
+    y, sr = librosa.load(file_path, sr=None)
     
-    # Input song name
-    input_song = "Alexander Scriabin, Julius Asal - PROLOGUE (Quasi Niente from Piano Sonata No. 1 in F Minor, Op. 6- IV. Funebre) - Upright Version_segment_0_30.wav"
+    # Extract features
+    features = {
+        'Chroma': np.mean(librosa.feature.chroma_stft(y=y, sr=sr)),
+        # Use librosa.beat.tempo for backward compatibility
+        'Tempo': librosa.beat.tempo(y=y, sr=sr)[0],
+        'Spectral_Centroid': np.mean(librosa.feature.spectral_centroid(y=y, sr=sr)),
+        'Zero_Crossing_Rate': np.mean(librosa.feature.zero_crossing_rate(y=y)),
+    }
+    
+    # Add MFCC features
+    mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
+    for i in range(13):
+        features[f'MFCC_{i+1}'] = np.mean(mfccs[i])
+    
+    # Add additional rhythmic features
+    features['Rhythmic_Regularity'] = np.mean(librosa.feature.spectral_contrast(y=y, sr=sr))
+    
+    print("Features extracted successfully.")
+    return features
+
+# Function to recommend songs for remixing
+def recommend_songs(input_song_features, data, cluster_labels, scaler, kmeans, known_genre=None):
+    feature_columns = [
+        'Chroma', 'Tempo', 'Spectral_Centroid', 'Zero_Crossing_Rate',
+        'MFCC_1', 'MFCC_2', 'MFCC_3', 'MFCC_4', 'MFCC_5',
+        'MFCC_6', 'MFCC_7', 'MFCC_8', 'MFCC_9', 'MFCC_10',
+        'MFCC_11', 'MFCC_12', 'MFCC_13', 'Rhythmic_Regularity'
+    ]
+    input_features_df = pd.DataFrame([input_song_features], columns=feature_columns)
+    input_scaled = scaler.transform(input_features_df)
+    print(f"Input scaled features: {input_scaled}")
+
+    # Predict the cluster and get its genre
+    input_cluster = kmeans.predict(input_scaled)[0]
+    input_genre = cluster_labels[input_cluster]
+    print(f"Predicted input cluster: {input_cluster}, genre: {input_genre}")
+
+    # Override genre if provided
+    if known_genre:
+        input_genre = known_genre
+        input_cluster = [k for k, v in cluster_labels.items() if v == known_genre][0]
+        print(f"Overriding input genre to: {known_genre}")
+
+    # Opposite cluster selection
+    target_genre = 'disco' if input_genre == 'classical' else 'classical'
+    target_cluster = [k for k, v in cluster_labels.items() if v == target_genre][0]
+    print(f"Target cluster: {target_cluster}, target genre: {target_genre}")
+
+    # Filter songs by target cluster and genre
+    target_songs = data[(data['Cluster'] == target_cluster) & (data['Label'] == target_genre)]
+    print(f"Filtered {len(target_songs)} songs from target genre '{target_genre}'.")
+
+    if target_songs.empty:
+        print("No songs available in the target cluster for recommendations.")
+        return input_genre, target_genre, pd.DataFrame()
+
+    target_features = target_songs[feature_columns]
+    print(f"Target features shape: {target_features.shape}")
+    similarities = cosine_similarity(input_scaled, scaler.transform(target_features)).flatten()
+    print(f"Similarities: {similarities}")
+
+    # Add similarity scores
+    target_songs = target_songs.copy()
+    target_songs['Similarity'] = similarities
+    recommendations = target_songs.sort_values(by='Similarity', ascending=False).head(5)
+    print(f"Generated {len(recommendations)} recommendations.")
+
+    return input_genre, target_genre, recommendations[['Label', 'Segment_File_Name', 'Similarity']]
+
+# Main function
+# Main function
+def main():
+    # Load artifacts and dataset
+    data, scaler, kmeans, cluster_labels = load_artifacts()
+
+    # Define feature columns
+    feature_columns = [
+        'Chroma', 'Tempo', 'Spectral_Centroid', 'Zero_Crossing_Rate',
+        'MFCC_1', 'MFCC_2', 'MFCC_3', 'MFCC_4', 'MFCC_5',
+        'MFCC_6', 'MFCC_7', 'MFCC_8', 'MFCC_9', 'MFCC_10',
+        'MFCC_11', 'MFCC_12', 'MFCC_13', 'Rhythmic_Regularity'
+    ]
+
+    # Clean and convert feature columns
+    for column in feature_columns:
+        data[column] = data[column].apply(lambda x: float(x.strip('[]')) if isinstance(x, str) else x)
+
+    # Handle non-numeric values
+    data[feature_columns] = data[feature_columns].apply(pd.to_numeric, errors='coerce')
+    data[feature_columns] = data[feature_columns].fillna(data[feature_columns].mean())
+
+    # Add the Cluster column
+    data['Cluster'] = kmeans.predict(scaler.transform(data[feature_columns]))
+    print("Cluster column added to dataset.")
+
+    # Set the path to the audio file
+    audio_file = r"C:\Users\Lenovo\Desktop\MusicMachineLearning\Remix_recom\Anja Lechner, François Couturier - Vague  E la nave va_segment_90_120.wav"
+
+    # Extract features from the input song
+    input_song_features = extract_features(audio_file)
+    print("\nExtracted Features:")
+    for feature, value in input_song_features.items():
+        print(f"{feature}: {value}")
+
+    # Known genre for debugging (set to 'classical' or 'disco' if applicable)
+    known_genre = None  # Change to 'classical' or 'disco' for testing
 
     # Get recommendations
-    try:
-        recommendations = recommend_songs(input_song, csv_file, top_n=5)
-        print(f"Songs recommended for remixing with '{input_song}':")
-        for song in recommendations:
-            print(f"- {song}")
-    except ValueError as e:
-        print(e)
+    input_genre, target_genre, recommendations = recommend_songs(input_song_features, data, cluster_labels, scaler, kmeans, known_genre)
+
+    # Print cluster and label distributions
+    print("Cluster distribution:\n", data['Cluster'].value_counts())
+    print("Label distribution:\n", data['Label'].value_counts())
+
+    # Print extracted input features
+    print(f"Extracted input features: {input_song_features}")
+
+    # Print dataset feature ranges
+    print(f"Dataset feature ranges: {data[feature_columns].min().to_dict()} to {data[feature_columns].max().to_dict()}")
+
+    # Display results
+    print(f"\nInput song genre: {input_genre}")
+    print(f"Recommended songs from the {target_genre} genre:")
+    print(recommendations.to_string(index=False))
+
+
+if __name__ == "__main__":
+    main()

@@ -9,7 +9,7 @@ from sklearn.metrics import accuracy_score
 
 def main():
     # Load the dataset
-    data = pd.read_csv(r"audio_features_genres_with_segments.csv")
+    data = pd.read_csv(r"C:\Users\Lenovo\Desktop\MusicMachineLearning\add_data\audio_features_genres_with_segments.csv")
 
     # Filter the dataset to include only Disco and Classical genres
     data = data[data['Label'].isin(['disco', 'classical'])]
