@@ -1,0 +1,19 @@
+# Ignore virtual environments
+/venv/
+
+# Ignore Python bytecode
+__pycache__/
+*.py[cod]
+
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+# Ignore logs
+*.log
+
+# Ignore environment files
+.env
+
+# Ignore the specific folder (replace 'folder_name' with the actual folder you want to ignore)
+/Segmented_Audio/
