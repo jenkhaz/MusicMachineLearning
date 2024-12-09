@@ -3,6 +3,9 @@ import joblib
 from sklearn.metrics.pairwise import cosine_similarity
 import librosa
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 
 # Function to load artifacts
 def load_artifacts():
@@ -130,6 +133,31 @@ def main():
     print(f"Recommended songs from the {target_genre} genre:")
     print(recommendations.to_string(index=False))
 
+    def plot_similarity_scores(recommendations):
+    # Rename the x-axis labels to "Recommended Song 1", "Recommended Song 2", etc.
+        recommendations = recommendations.copy()  # Avoid modifying the original DataFrame
+        recommendations['Song Label'] = [f"Recommended Song {i+1}" for i in range(len(recommendations))]
+        
+        # Define custom colors
+        colors = ['#1d434e', '#4eb6b0', '#830131', '#a96d83']
+        bar_colors = colors * (len(recommendations) // len(colors)) + colors[:len(recommendations) % len(colors)]
+        
+        # Plot
+        plt.figure(figsize=(10, 6))
+        sns.barplot(data=recommendations, x='Song Label', y='Similarity', palette=bar_colors)
+        plt.title('Similarity Scores for Recommended Songs')
+        plt.xlabel('Recommended Songs')
+        plt.ylabel('Similarity Score')
+        plt.xticks(rotation=45, ha='right')
+        plt.tight_layout()
+        
+        # Save the plot as a file
+        plt.savefig('recommended_songs_similarity_plot.png', dpi=300, bbox_inches='tight')
+        plt.show()
+
+
+        
+    plot_similarity_scores(recommendations)
 
 if __name__ == "__main__":
     main()
