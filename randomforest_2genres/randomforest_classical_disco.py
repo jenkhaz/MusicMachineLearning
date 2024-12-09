@@ -84,13 +84,16 @@ def main():
     print("Classification Report:")
     print(classification_report(y_test, y_pred, target_names=label_encoder.classes_))
 
-    # Plot and save confusion matrix
+    # Define a custom colormap
+    custom_cmap = LinearSegmentedColormap.from_list("custom_cmap", ["#fef5f8", "#830131"], N=256)
+
+    # Plot and save confusion matrix with the custom colormap
     conf_mat = confusion_matrix(y_test, y_pred)
     plt.figure(figsize=(8, 6))
     sns.heatmap(conf_mat, annot=True, fmt='d',
                 xticklabels=label_encoder.classes_,
                 yticklabels=label_encoder.classes_,
-                cmap='Blues', cbar=True)
+                cmap=custom_cmap, cbar=True)
     plt.ylabel('Actual')
     plt.xlabel('Predicted')
     plt.title('Confusion Matrix')
