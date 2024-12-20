@@ -17,6 +17,12 @@ rf_classifier = joblib.load('rf_genre_classifier.pkl')
 label_encoder = joblib.load('label_encoder.pkl')
 
 def extract_features(y, sr):
+    """
+    Extract audio features from a waveform and sampling rate.
+
+    Returns a list of:
+    [Chroma, Tempo, Spectral Centroid, Zero Crossing Rate, 13 MFCCs, Rhythmic Regularity].
+    """
     try:
         chroma = librosa.feature.chroma_stft(y=y, sr=sr).mean()
         tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
@@ -32,7 +38,16 @@ def extract_features(y, sr):
         return None
 
 def transform_genre(song_path, target_genre='disco', step_size=0.5, max_steps=100):
-    # Load audio
+    """
+    Iteratively adjust certain features of an audio track's feature vector to push its
+    predicted genre towards the target genre using a trained Random Forest classifier.
+    
+    Steps:
+    - Extract features from the provided audio file.
+    - Scale and align features with the model.
+    - Adjust a subset of features towards the target genre's cluster centroid.
+    - Stop when the target genre is reached or maximum steps is reached.
+    """ # Load audio
     y, sr = librosa.load(song_path, sr=22050)
     song_features = extract_features(y, sr)
 
@@ -126,6 +141,11 @@ print(final_features)
 
 
 def generate_recommendations(initial_features, final_features, feature_names):
+    """
+    Compare initial and final feature values to produce recommendations.
+    For each feature, indicate whether to increase or decrease, and by how much.
+    """
+  
     # Align feature lengths
     if len(initial_features) != len(final_features):
         print(f"Aligning features: initial ({len(initial_features)}) vs final ({len(final_features)})")
