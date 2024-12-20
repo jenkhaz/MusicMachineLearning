@@ -11,6 +11,21 @@ import seaborn as sns
 from matplotlib.colors import LinearSegmentedColormap
 
 def main():
+    """
+    Main function that loads the dataset, processes the features, 
+    trains a Random Forest model, evaluates its performance, performs 
+    hyperparameter tuning, and saves the trained models and encoders.
+
+    The process includes:
+    - Loading the dataset from a CSV file.
+    - Preprocessing the data (handling missing values and converting features to numeric).
+    - Splitting the dataset into training and testing sets.
+    - Training a Random Forest Classifier.
+    - Evaluating the model and generating performance metrics.
+    - Performing hyperparameter tuning using GridSearchCV.
+    - Saving the best model, scaler, and label encoder.
+    - Analyzing feature importance.
+    """
     # Load the dataset from the CSV file
     csv_file_path = r'C:\Users\Lenovo\Desktop\MusicMachineLearning\add_data\audio_features_genres_with_segments.csv'
     print("Loading dataset from CSV file...")
@@ -24,6 +39,15 @@ def main():
     # Convert feature columns to numeric values
     print("Converting feature columns to numeric values...")
     def convert_to_float(x):
+        """
+        Converts a given value to a float after cleaning up any non-numeric characters.
+        
+        Args:
+        x (str or numeric): The value to be converted to a float.
+
+        Returns:
+        float: The converted numeric value.
+        """
         try:
             if isinstance(x, (float, int)):
                 return x
