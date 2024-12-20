@@ -1,87 +1,163 @@
 import pandas as pd
+import joblib
 from sklearn.metrics.pairwise import cosine_similarity
+import librosa
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-def recommend_songs(input_song_name, csv_path, top_n=5):
-    """
-    Recommends songs from the dataset that would go well with the input song for a remix.
 
-    Parameters:
-    - input_song_name (str): Name of the song (must match the Segment_File_Name in the CSV).
-    - csv_path (str): Path to the CSV file containing song features.
-    - top_n (int): Number of recommendations to return.
-
-    Returns:
-    - List of recommended songs.
-    """
+# Function to load artifacts
+def load_artifacts():
     # Load the dataset
-    data = pd.read_csv(csv_path)
+    data = pd.read_csv(r"C:\Users\Lenovo\Desktop\MusicMachineLearning\add_data\audio_features_genres_with_segments.csv")
+    print(f"Dataset loaded successfully. Number of rows: {len(data)}")
 
-    # Ensure the required columns are present
-    if 'Segment_File_Name' not in data.columns:
-        raise ValueError("The dataset must contain a 'Segment_File_Name' column.")
+    # Load the trained Random Forest model, scaler, and label encoder
+    rf_classifier = joblib.load(r"C:\Users\Lenovo\Desktop\MusicMachineLearning\randomforest_2genres\rf_genre_classifier.pkl")
+    scaler = joblib.load(r"C:\Users\Lenovo\Desktop\MusicMachineLearning\randomforest_2genres\scaler.pkl")
+    label_encoder = joblib.load(r"C:\Users\Lenovo\Desktop\MusicMachineLearning\randomforest_2genres\label_encoder.pkl")
+    print("Random Forest model, scaler, and label encoder loaded successfully.")
 
-    # Extract the base song name (remove segment info)
-    def get_base_song_name(file_name):
-        return "_".join(file_name.split("_segment")[0].split())
+    return data, scaler, rf_classifier, label_encoder
 
-    input_base_song_name = get_base_song_name(input_song_name)
+# Function to extract features from an audio file
+def extract_features(file_path):
+    print(f"Extracting features from file: {file_path}")
+    y, sr = librosa.load(file_path, sr=None)
 
-    # Filter out segments of the same song
-    data['Base_Song_Name'] = data['Segment_File_Name'].apply(get_base_song_name)
-    filtered_data = data[data['Base_Song_Name'] != input_base_song_name]
+    # Extract features
+    features = {
+        'Chroma': np.mean(librosa.feature.chroma_stft(y=y, sr=sr)),
+        'Tempo': librosa.beat.tempo(y=y, sr=sr)[0],
+        'Spectral_Centroid': np.mean(librosa.feature.spectral_centroid(y=y, sr=sr)),
+        'Zero_Crossing_Rate': np.mean(librosa.feature.zero_crossing_rate(y=y)),
+    }
 
-    # Drop non-numeric columns for similarity calculation
-    non_feature_columns = ['Label', 'Segment_File_Name', 'Base_Song_Name']
-    feature_columns = [col for col in data.columns if col not in non_feature_columns]
+    # Add MFCC features
+    mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
+    for i in range(13):
+        features[f'MFCC_{i+1}'] = np.mean(mfccs[i])
 
-    # Convert feature columns to numeric values (handle nested lists or complex strings)
-    for col in feature_columns:
-        filtered_data[col] = filtered_data[col].apply(
-            lambda x: np.mean([float(i) for i in str(x).strip("[]").split(",") if i.strip()]) if isinstance(x, str) else x
-        )
-        data[col] = data[col].apply(
-            lambda x: np.mean([float(i) for i in str(x).strip("[]").split(",") if i.strip()]) if isinstance(x, str) else x
-        )
+    # Add additional rhythmic features
+    features['Rhythmic_Regularity'] = np.mean(librosa.feature.spectral_contrast(y=y, sr=sr))
 
-    # Ensure the input song exists in the dataset
-    if input_song_name not in data['Segment_File_Name'].values:
-        raise ValueError(f"The song '{input_song_name}' is not in the dataset.")
+    print("Features extracted successfully.")
+    print(f"Extracted features: {features}")
+    return features
 
-    # Normalize features
-    features = filtered_data[feature_columns]
-    features_normalized = (features - features.mean()) / features.std()
+# Function to recommend songs for remixing
+def recommend_songs(input_song_features, data, label_encoder, scaler, rf_classifier):
+    feature_columns = [
+        'Chroma', 'Tempo', 'Spectral_Centroid', 'Zero_Crossing_Rate',
+        'MFCC_1', 'MFCC_2', 'MFCC_3', 'MFCC_4', 'MFCC_5',
+        'MFCC_6', 'MFCC_7', 'MFCC_8', 'MFCC_9', 'MFCC_10',
+        'MFCC_11', 'MFCC_12', 'MFCC_13', 'Rhythmic_Regularity'
+    ]
 
-    # Extract and normalize the input song features
-    input_features = data.loc[data['Segment_File_Name'] == input_song_name, feature_columns]
-    input_features = input_features.astype(float)  # Ensure all values are numeric
-    input_features_normalized = (input_features - features.mean()) / features.std()
-    input_features_normalized = input_features_normalized.to_numpy()  # Convert to NumPy array
+    # Ensure the input features match the expected features
+    missing_features = set(feature_columns) - set(input_song_features.keys())
+    print(f"Expected features: {feature_columns}")
+    print(f"Input features: {list(input_song_features.keys())}")
+    print(f"Missing features: {missing_features}")
 
-    # Calculate similarity between the input song and all other songs
-    similarity_scores = cosine_similarity(input_features_normalized, features_normalized).flatten()
+    for feature in missing_features:
+        input_song_features[feature] = 0
 
-    # Get the indices of the top_n most similar songs
-    similar_indices = np.argsort(similarity_scores)[::-1][:top_n]
+    # Add an extra placeholder feature to align with scaler
+    input_features_df = pd.DataFrame([input_song_features], columns=feature_columns)
+    if input_features_df.shape[1] < scaler.n_features_in_:
+        input_features_df['Extra_Feature_18'] = 0  # Add missing extra feature
 
-    # Fetch recommended songs
-    recommended_songs = filtered_data.iloc[similar_indices]['Segment_File_Name'].values
+    print(f"Input features dataframe:\n{input_features_df}")
+    input_scaled = scaler.transform(input_features_df)
+    print(f"Scaled input features: {input_scaled}")
 
-    return recommended_songs
+    # Predict the genre
+    input_genre_index = rf_classifier.predict(input_scaled)[0]
+    input_genre = label_encoder.inverse_transform([input_genre_index])[0]
+    print(f"Predicted input genre: {input_genre}")
 
-# Example Usage
-if __name__ == "__main__":
-    # Input CSV file path
-    csv_file = r"C:\Users\Lenovo\Desktop\MusicMachineLearning\audio_features_genres_with_segments.csv"
-    
-    # Input song name
-    input_song = "Alexander Scriabin, Julius Asal - PROLOGUE (Quasi Niente from Piano Sonata No. 1 in F Minor, Op. 6- IV. Funebre) - Upright Version_segment_0_30.wav"
+    # Determine the target genre
+    target_genre = 'disco' if input_genre == 'classical' else 'classical'
+    print(f"Target genre: {target_genre}")
+
+    # Filter songs by target genre
+    target_songs = data[data['Label'] == target_genre]
+    print(f"Filtered {len(target_songs)} songs from target genre '{target_genre}'.")
+
+    # Add extra placeholder feature to target_features
+    target_features = target_songs[feature_columns].copy()
+    if target_features.shape[1] < scaler.n_features_in_:
+        target_features['Extra_Feature_18'] = 0
+
+    target_scaled = scaler.transform(target_features)
+    similarities = cosine_similarity(input_scaled, target_scaled).flatten()
+
+    # Add similarity scores and sort
+    target_songs = target_songs.copy()
+    target_songs['Similarity'] = similarities
+    recommendations = target_songs.sort_values(by='Similarity', ascending=False).head(5)
+    print(f"Generated {len(recommendations)} recommendations.")
+
+    return input_genre, target_genre, recommendations[['Label', 'Segment_File_Name', 'Similarity']]
+
+# Main function
+def main():
+    # Load artifacts
+    data, scaler, rf_classifier, label_encoder = load_artifacts()
+
+    # Define features and process data
+    feature_columns = [
+        'Chroma', 'Tempo', 'Spectral_Centroid', 'Zero_Crossing_Rate',
+        'MFCC_1', 'MFCC_2', 'MFCC_3', 'MFCC_4', 'MFCC_5',
+        'MFCC_6', 'MFCC_7', 'MFCC_8', 'MFCC_9', 'MFCC_10',
+        'MFCC_11', 'MFCC_12', 'MFCC_13', 'Rhythmic_Regularity'
+    ]
+    data[feature_columns] = data[feature_columns].apply(pd.to_numeric, errors='coerce')
+    data[feature_columns] = data[feature_columns].fillna(data[feature_columns].mean())
+
+    # Add extra placeholder feature to the dataset
+    if data.shape[1] < scaler.n_features_in_:
+        data['Extra_Feature_18'] = 0
+
+    # Extract features
+    audio_file = r"C:\Users\Lenovo\Desktop\MusicMachineLearning\Remix_recom\Anja Lechner, François Couturier - Vague  E la nave va_segment_90_120.wav"
+    input_song_features = extract_features(audio_file)
 
     # Get recommendations
-    try:
-        recommendations = recommend_songs(input_song, csv_file, top_n=5)
-        print(f"Songs recommended for remixing with '{input_song}':")
-        for song in recommendations:
-            print(f"- {song}")
-    except ValueError as e:
-        print(e)
+    input_genre, target_genre, recommendations = recommend_songs(input_song_features, data, label_encoder, scaler, rf_classifier)
+
+    # Display results
+    print(f"\nInput song genre: {input_genre}")
+    print(f"Recommended songs from the {target_genre} genre:")
+    print(recommendations.to_string(index=False))
+
+    def plot_similarity_scores(recommendations):
+    # Rename the x-axis labels to "Recommended Song 1", "Recommended Song 2", etc.
+        recommendations = recommendations.copy()  # Avoid modifying the original DataFrame
+        recommendations['Song Label'] = [f"Recommended Song {i+1}" for i in range(len(recommendations))]
+        
+        # Define custom colors
+        colors = ['#1d434e', '#4eb6b0', '#830131', '#a96d83']
+        bar_colors = colors * (len(recommendations) // len(colors)) + colors[:len(recommendations) % len(colors)]
+        
+        # Plot
+        plt.figure(figsize=(10, 6))
+        sns.barplot(data=recommendations, x='Song Label', y='Similarity', palette=bar_colors)
+        plt.title('Similarity Scores for Recommended Songs')
+        plt.xlabel('Recommended Songs')
+        plt.ylabel('Similarity Score')
+        plt.xticks(rotation=45, ha='right')
+        plt.tight_layout()
+        
+        # Save the plot as a file
+        plt.savefig('recommended_songs_similarity_plot.png', dpi=300, bbox_inches='tight')
+        plt.show()
+
+
+        
+    plot_similarity_scores(recommendations)
+
+if __name__ == "__main__":
+    main()
