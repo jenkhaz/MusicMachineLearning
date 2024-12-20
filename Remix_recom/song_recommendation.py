@@ -9,6 +9,15 @@ import seaborn as sns
 
 # Function to load artifacts
 def load_artifacts():
+    """
+    Loads the dataset, Random Forest classifier, scaler, and label encoder from saved files.
+    
+    Returns:
+        data (pandas.DataFrame): Loaded dataset containing audio features and genres.
+        scaler (sklearn.preprocessing.StandardScaler): Scaler used to normalize input features.
+        rf_classifier (sklearn.ensemble.RandomForestClassifier): Pre-trained Random Forest model for genre prediction.
+        label_encoder (sklearn.preprocessing.LabelEncoder): Label encoder used to convert genre labels to numerical values.
+    """
     # Load the dataset
     data = pd.read_csv(r"C:\Users\Lenovo\Desktop\MusicMachineLearning\add_data\audio_features_genres_with_segments.csv")
     print(f"Dataset loaded successfully. Number of rows: {len(data)}")
@@ -23,6 +32,15 @@ def load_artifacts():
 
 # Function to extract features from an audio file
 def extract_features(file_path):
+    """
+    Extracts audio features from a given audio file using librosa.
+
+    Args:
+        file_path (str): Path to the audio file.
+
+    Returns:
+        features (dict): Dictionary containing extracted features such as Chroma, Tempo, Spectral Centroid, Zero Crossing Rate, MFCCs, and Rhythmic Regularity.
+    """
     print(f"Extracting features from file: {file_path}")
     y, sr = librosa.load(file_path, sr=None)
 
@@ -48,6 +66,21 @@ def extract_features(file_path):
 
 # Function to recommend songs for remixing
 def recommend_songs(input_song_features, data, label_encoder, scaler, rf_classifier):
+    """
+    Recommends songs for remixing based on the input song's features by comparing them to other songs in the dataset.
+
+    Args:
+        input_song_features (dict): Features of the input song to be compared.
+        data (pandas.DataFrame): Dataset containing features and genres of songs.
+        label_encoder (sklearn.preprocessing.LabelEncoder): Label encoder to decode genre labels.
+        scaler (sklearn.preprocessing.StandardScaler): Scaler used to normalize features.
+        rf_classifier (sklearn.ensemble.RandomForestClassifier): Trained Random Forest model for genre classification.
+
+    Returns:
+        input_genre (str): Genre of the input song.
+        target_genre (str): Target genre for remixing (opposite of input genre).
+        recommendations (pandas.DataFrame): Top 5 recommended songs for remixing, sorted by similarity score.
+    """
     feature_columns = [
         'Chroma', 'Tempo', 'Spectral_Centroid', 'Zero_Crossing_Rate',
         'MFCC_1', 'MFCC_2', 'MFCC_3', 'MFCC_4', 'MFCC_5',
@@ -104,6 +137,10 @@ def recommend_songs(input_song_features, data, label_encoder, scaler, rf_classif
 
 # Main function
 def main():
+    """
+    Main function to execute the song recommendation process.
+    Loads artifacts, extracts features from an audio file, generates song recommendations, and displays the results.
+    """
     # Load artifacts
     data, scaler, rf_classifier, label_encoder = load_artifacts()
 
@@ -134,6 +171,12 @@ def main():
     print(recommendations.to_string(index=False))
 
     def plot_similarity_scores(recommendations):
+        """
+        Plots a bar chart displaying the similarity scores of recommended songs.
+
+        Args:
+            recommendations (pandas.DataFrame): DataFrame containing the recommended songs and their similarity scores.
+        """    
     # Rename the x-axis labels to "Recommended Song 1", "Recommended Song 2", etc.
         recommendations = recommendations.copy()  # Avoid modifying the original DataFrame
         recommendations['Song Label'] = [f"Recommended Song {i+1}" for i in range(len(recommendations))]
